@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Empresa</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .client-list {
+            margin-bottom: 20px;
+        }
+        .client-item {
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .notification {
+            background-color: #ff4d4d;
+            color: white;
+            border-radius: 12px;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+            display: none; /* Inicialmente oculto */
+        }
+        .chat-window {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            background: white;
+            width: 100%;
+            max-width: 600px;
+            display: none;
+        }
+        .chat-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 200px;
+            overflow-y: scroll;
+            background: white;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 70%;
+            display: inline-block;
+        }
+        .sent {
+            background-color: #e0ffe0;
+            text-align: right;
+            float: right;
+        }
+        .received {
+            background-color: #ffe0e0;
+            text-align: left;
+            float: left;
+        }
+        .response {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .response input {
+            width: 80%;
+            padding: 10px;
+        }
+        .delete-button {
+            background-color: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Clientes en Chat</h2>
+<div class="client-list" id="clientList"></div>
+
+<script>
+    const clientList = document.getElementById('clientList');
+    let currentChatWindow = null;
+
+    // Crear un item de cliente
+    function createClientItem(clientId, clientName) {
+        const clientItem = document.createElement('div');
+        clientItem.className = 'client-item';
+        clientItem.textContent = `${clientName} (ID: ${clientId})`; // Mostrar nombre y ID
+        const notification = document.createElement('span');
+        notification.className = 'notification';
+        notification.id = `notification-${clientId}`;
+        clientItem.appendChild(notification);
+        
+        clientItem.onclick = function() {
+            openChat(clientId, clientName);
+        };
+        clientList.appendChild(clientItem);
+
+        // Mostrar notificación si existe en el almacenamiento local
+        const hasNotification = localStorage.getItem(`notification-${clientId}`);
+        if (hasNotification) {
+            notification.style.display = 'inline'; // Mostrar notificación
+        }
+    }
+
+    // Abrir chat con un cliente
+    function openChat(clientId, clientName) {
+        if (currentChatWindow) {
+            currentChatWindow.style.display = 'none';
+        }
+
+        const chatWindow = document.getElementById(`chat-${clientId}`);
+        if (chatWindow) {
+            chatWindow.style.display = 'block';
+            currentChatWindow = chatWindow;
+            const notification = document.getElementById(`notification-${clientId}`);
+            notification.style.display = 'none'; 
+            localStorage.removeItem(`notification-${clientId}`); // Eliminar notificación
+        } else {
+            createChatWindow(clientId, clientName);
+        }
+    }
+
+    // Crear ventana de chat
+    function createChatWindow(clientId, clientName) {
+        const chatWindow = document.createElement('div');
+        chatWindow.className = 'chat-window';
+        chatWindow.id = `chat-${clientId}`;
+        chatWindow.innerHTML = `
+            <h3>${clientName} (ID: ${clientId})</h3>
+            <div class="chat-box" id="chat-box-${clientId}"></div>
+            <div class="response">
+                <input type="text" id="message-${clientId}" placeholder="Escribe tu mensaje como Empresa...">
+                <button id="send-${clientId}">Enviar</button>
+            </div>
+            <button class="delete-button" onclick="deleteChat('${clientId}')">Eliminar Chat</button>
+        `;
+        clientList.appendChild(chatWindow);
+
+        const sendButton = document.getElementById(`send-${clientId}`);
+        sendButton.onclick = function() {
+            sendMessage(clientId);
+        };
+
+        loadMessages(clientId);
+        setInterval(() => loadMessages(clientId), 1000);
+    }
+
+    // Cargar mensajes
+    function loadMessages(clientId) {
+        const chatBox = document.getElementById(`chat-box-${clientId}`);
+        const messages = JSON.parse(localStorage.getItem(`chat-${clientId}`)) || [];
+        chatBox.innerHTML = '';
+        messages.forEach(msg => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${msg.sender === 'Empresa' ? 'sent' : 'received'}`;
+            messageDiv.textContent = `${msg.sender}: ${msg.message}`;
+            chatBox.appendChild(messageDiv);
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Enviar mensaje
+    function sendMessage(clientId) {
+        const messageInput = document.getElementById(`message-${clientId}`);
+        const message = messageInput.value.trim();
+        if (message) {
+            const msg = { sender: 'Empresa', message };
+            const messages = JSON.parse(localStorage.getItem(`chat-${clientId}`)) || [];
+            messages.push(msg);
+            localStorage.setItem(`chat-${clientId}`, JSON.stringify(messages));
+            messageInput.value = '';
+            loadMessages(clientId);
+            
+            // Notificar al cliente
+            const event = new CustomEvent('newMessage', { detail: clientId });
+            document.dispatchEvent(event);
+            localStorage.setItem(`notification-${clientId}`, 'true'); // Guardar estado de notificación
+        }
+    }
+
+    // Eliminar chat
+    function deleteChat(clientId) {
+        if (confirm(`¿Estás seguro de que deseas eliminar el chat?`)) {
+            localStorage.removeItem(`chat-${clientId}`);
+            localStorage.removeItem(`notification-${clientId}`); // Eliminar notificación al eliminar chat
+            const chatWindow = document.getElementById(`chat-${clientId}`);
+            clientList.removeChild(chatWindow);
+            const clientItem = Array.from(clientList.children).find(item => item.textContent.includes(clientId));
+            if (clientItem) {
+                clientList.removeChild(clientItem);
+            }
+            if (currentChatWindow === chatWindow) {
+                currentChatWindow = null;
+            }
+        }
+    }
+
+    // Cargar clientes existentes
+    const clients = Object.keys(localStorage).filter(key => key.startsWith('chat-'));
+    clients.forEach(client => {
+        const clientId = client.replace('chat-', '');
+        const clientName = localStorage.getItem(`name-${clientId}`); // Obtener el nombre basado en el ID
+        createClientItem(clientId, clientName);
+    });
+
+    // Escuchar cambios en el almacenamiento local
+    window.addEventListener('storage', function(event) {
+        if (event.key && event.key.startsWith('chat-')) {
+            const clientId = event.key.replace('chat-', '');
+            const notification = document.getElementById(`notification-${clientId}`);
+            if (notification) {
+                notification.style.display = 'inline'; // Mostrar notificación
+                localStorage.setItem(`notification-${clientId}`, 'true'); // Guardar estado de notificación
+            }
+        }
+    });
+
+    // Escuchar evento de nuevo cliente
+    window.addEventListener('storage', function(event) {
+        if (event.key && event.key.startsWith('name-')) {
+            const clientId = event.key.replace('name-', '');
+            const clientName = localStorage.getItem(event.key);
+            createClientItem(clientId, clientName); // Crear el item de cliente
+            createChatWindow(clientId, clientName); // Crear la ventana de chat automáticamente
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Cliente</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .chat-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            background: white;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 70%;
+            display: inline-block;
+        }
+        .sent {
+            background-color: #e0ffe0;
+            text-align: right;
+            float: right;
+        }
+        .received {
+            background-color: #ffe0e0;
+            text-align: left;
+            float: left;
+        }
+        .response {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .response input {
+            width: 80%;
+            padding: 10px;
+        }
+        .warning {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Identifícate para chatear</h2>
+<input type="text" id="clientName" placeholder="Ingresa tu nombre" />
+<button id="startChat">Iniciar Chat</button>
+
+<div class="chat-box" id="chat" style="display:none;"></div>
+<div class="response" style="display:none;">
+    <input type="text" id="message" placeholder="Escribe tu mensaje como Cliente...">
+    <button id="send">Enviar</button>
+</div>
+<div class="warning" id="warningMessage">
+    La conversación se va a eliminar si recargas o sales de la página, y será necesario iniciar un nuevo chat.
+</div>
+
+<script>
+    const chatBox = document.getElementById('chat');
+    const sendButton = document.getElementById('send');
+    const messageInput = document.getElementById('message');
+    const clientNameInput = document.getElementById('clientName');
+    const startChatButton = document.getElementById('startChat');
+    const warningMessage = document.getElementById('warningMessage');
+
+    let clientId = '';
+
+    startChatButton.onclick = function() {
+        const clientName = clientNameInput.value.trim();
+        if (clientName) {
+            // Generar un ID único para el cliente
+            clientId = 'client-' + Date.now(); // Usar timestamp como ID único
+            localStorage.setItem(clientId, clientName); // Almacenar el nombre con el ID
+            localStorage.setItem(`name-${clientId}`, clientName); // Almacenar el nombre para uso posterior
+            chatBox.style.display = 'block';
+            document.querySelector('.response').style.display = 'flex';
+            warningMessage.style.display = 'block';
+            loadMessages(clientId);
+        }
+    };
+
+    function loadMessages(clientId) {
+        const messages = JSON.parse(localStorage.getItem(`chat-${clientId}`)) || [];
+        chatBox.innerHTML = '';
+        messages.forEach(msg => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${msg.sender === 'Cliente' ? 'sent' : 'received'}`;
+            messageDiv.textContent = `${msg.sender}: ${msg.message}`;
+            chatBox.appendChild(messageDiv);
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (message) {
+            const msg = { sender: 'Cliente', message };
+            const messages = JSON.parse(localStorage.getItem(`chat-${clientId}`)) || [];
+            messages.push(msg);
+            localStorage.setItem(`chat-${clientId}`, JSON.stringify(messages));
+            messageInput.value = '';
+            loadMessages(clientId);
+
+            // Notificar a la empresa sobre el mensaje enviado
+            const event = new Event('storage', { bubbles: true });
+            event.key = `chat-${clientId}`;
+            window.dispatchEvent(event);
+        }
+    }
+
+    sendButton.onclick = sendMessage;
+
+    setInterval(() => loadMessages(clientId), 1000);
+
+    window.onbeforeunload = function() {
+        return "La conversación se va a eliminar si recargas o sales de la página, y será necesario iniciar un nuevo chat.";
+    };
+</script>
+
+</body>
+</html>
